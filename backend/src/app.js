@@ -1,5 +1,6 @@
 // src/app.js
 // Express app setup with middleware
+// ✅ Vercel-compatible + /health route
 
 const express = require('express');
 const helmet = require('helmet');
@@ -24,10 +25,11 @@ const allowedOrigins = (env.CORS_ORIGIN || 'http://localhost:5173')
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (curl, mobile apps, etc.)
+      // Allow requests with no origin (curl, mobile apps, Vercel internal)
       if (!origin) return callback(null, true);
 
-      if (allowedOrigins.includes(origin)) {
+      // Allow if in allowed origins OR wildcard
+      if (allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
         callback(null, true);
       } else {
         callback(new Error(`CORS blocked: ${origin}`));
@@ -78,10 +80,19 @@ const limiter = rateLimit({
 app.use('/api', limiter);
 
 // ===== Health Check =====
+// ✅ Both /health and /api/health for Vercel compatibility
 app.get('/health', (req, res) => {
   res.json({
     status: 'OK',
-    timestamp: new Date(),
+    timestamp: new Date().toISOString(),
+    environment: env.NODE_ENV
+  });
+});
+
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'OK',
+    timestamp: new Date().toISOString(),
     environment: env.NODE_ENV
   });
 });
