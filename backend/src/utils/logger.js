@@ -1,14 +1,13 @@
 // src/utils/logger.js
-// Logger setup — Vercel serverless compatible
-// ✅ FIXED: Console-only on Vercel, file logging on local
+// Logger — Vercel serverless compatible (console-only)
 
 const winston = require('winston');
 const env = require('../config/env');
 
-// ✅ Determine if we're on Vercel
+// ✅ Vercel detection
 const isVercel = process.env.VERCEL === '1' || process.env.VERCEL_ENV;
 
-// ✅ Define log format
+// ✅ Format
 const logFormat = winston.format.combine(
   winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
   winston.format.errors({ stack: true }),
@@ -21,9 +20,8 @@ const logFormat = winston.format.combine(
   })
 );
 
-// ✅ Transports — conditional
+// ✅ Console only (always)
 const transports = [
-  // ✅ Console — always
   new winston.transports.Console({
     format: winston.format.combine(
       winston.format.colorize(),
@@ -32,28 +30,35 @@ const transports = [
   })
 ];
 
-// ✅ File transports — ONLY on local (NOT Vercel)
-if (!isVercel && env.NODE_ENV !== 'production') {
+// ✅ File logging only on local (NOT Vercel, NOT production)
+if (!isVercel && env.NODE_ENV === 'development') {
   try {
+    // Create logs dir only if local
+    const fs = require('fs');
+    const path = require('path');
+    const logDir = path.join(__dirname, '../../logs');
+    if (!fs.existsSync(logDir)) {
+      fs.mkdirSync(logDir, { recursive: true });
+    }
+
     transports.push(
       new winston.transports.File({
-        filename: 'logs/error.log',
+        filename: path.join(logDir, 'error.log'),
         level: 'error',
         maxsize: 5242880,
         maxFiles: 5
       }),
       new winston.transports.File({
-        filename: 'logs/combined.log',
+        filename: path.join(logDir, 'combined.log'),
         maxsize: 5242880,
         maxFiles: 5
       })
     );
-  } catch (error) {
-    console.warn('File logging disabled:', error.message);
+  } catch (err) {
+    console.warn('File logging disabled:', err.message);
   }
 }
 
-// ✅ Create logger
 const logger = winston.createLogger({
   level: env.NODE_ENV === 'production' ? 'info' : 'debug',
   format: logFormat,
