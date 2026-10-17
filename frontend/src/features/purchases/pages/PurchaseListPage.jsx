@@ -98,9 +98,11 @@ export default function PurchaseListPage() {
     [page, debouncedSearch, paymentStatus, dateParams]
   );
 
-  const { data: res, isLoading } = useGetPurchasesQuery(queryParams, {
+  // ✅ isFetching add kora holo pagination loading er jonno
+  const { data: res, isLoading, isFetching } = useGetPurchasesQuery(queryParams, {
     refetchOnMountOrArgChange: true
   });
+  
   const [cancelPurchase, { isLoading: isCancelling }] = useCancelPurchaseMutation();
   const [deletePurchase, { isLoading: isDeleting }] = useDeletePurchaseMutation();
 
@@ -295,9 +297,10 @@ export default function PurchaseListPage() {
             />
           </div>
 
+          {/* ✅ isFetching pass kora holo jate table e loading state thake */}
           <PurchaseTable
             data={purchases}
-            isLoading={isLoading}
+            isLoading={isLoading || isFetching}
             onView={(p) => {
               setViewTarget(p);
               setViewOpen(true);
@@ -309,7 +312,12 @@ export default function PurchaseListPage() {
 
           {pagination && pagination.total > 0 && (
             <div className="border-t border-border">
-              <Pagination pagination={pagination} onPageChange={setPage} />
+              {/* ✅ isLoading pass kora holo */}
+              <Pagination 
+                pagination={pagination} 
+                onPageChange={setPage} 
+                isLoading={isLoading || isFetching} 
+              />
             </div>
           )}
         </Card>

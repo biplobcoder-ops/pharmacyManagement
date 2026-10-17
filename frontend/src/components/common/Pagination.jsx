@@ -1,8 +1,9 @@
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+// src/components/common/Pagination.jsx
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
-export default function Pagination({ pagination, onPageChange, className }) {
+export default function Pagination({ pagination, onPageChange, className, isLoading = false }) {
   if (!pagination) return null;
 
   const { page, totalPages, total, limit } = pagination;
@@ -44,11 +45,16 @@ export default function Pagination({ pagination, onPageChange, className }) {
         className
       )}
     >
-      {/* Info */}
-      <p className="text-xs text-muted-foreground order-2 sm:order-1">
-        Showing <span className="font-medium text-foreground">{start}-{end}</span> of{' '}
-        <span className="font-medium text-foreground">{total}</span>
-      </p>
+      {/* Info & Loading Spinner */}
+      <div className="flex items-center gap-2 order-2 sm:order-1">
+        {/* ✅ Loading hole spinner dekhabe */}
+        {isLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+        
+        <p className="text-xs text-muted-foreground">
+          Showing <span className="font-medium text-foreground">{start}-{end}</span> of{' '}
+          <span className="font-medium text-foreground">{total}</span>
+        </p>
+      </div>
 
       {/* Controls */}
       <div className="flex items-center gap-1 order-1 sm:order-2">
@@ -58,7 +64,7 @@ export default function Pagination({ pagination, onPageChange, className }) {
           size="icon"
           className="h-8 w-8 hidden sm:flex"
           onClick={() => onPageChange(1)}
-          disabled={page === 1}
+          disabled={page === 1 || isLoading} // ✅ isLoading disable kore dibe
         >
           <ChevronsLeft className="h-4 w-4" />
         </Button>
@@ -69,7 +75,7 @@ export default function Pagination({ pagination, onPageChange, className }) {
           size="icon"
           className="h-8 w-8"
           onClick={() => onPageChange(page - 1)}
-          disabled={page === 1}
+          disabled={page === 1 || isLoading} // ✅ isLoading disable kore dibe
         >
           <ChevronLeft className="h-4 w-4" />
         </Button>
@@ -91,6 +97,7 @@ export default function Pagination({ pagination, onPageChange, className }) {
                 size="icon"
                 className="h-8 w-8 text-xs"
                 onClick={() => onPageChange(p)}
+                disabled={isLoading} // ✅ isLoading disable kore dibe
               >
                 {p}
               </Button>
@@ -109,7 +116,7 @@ export default function Pagination({ pagination, onPageChange, className }) {
           size="icon"
           className="h-8 w-8"
           onClick={() => onPageChange(page + 1)}
-          disabled={page === totalPages}
+          disabled={page === totalPages || isLoading} // ✅ isLoading disable kore dibe
         >
           <ChevronRight className="h-4 w-4" />
         </Button>
@@ -120,7 +127,7 @@ export default function Pagination({ pagination, onPageChange, className }) {
           size="icon"
           className="h-8 w-8 hidden sm:flex"
           onClick={() => onPageChange(totalPages)}
-          disabled={page === totalPages}
+          disabled={page === totalPages || isLoading} // ✅ isLoading disable kore dibe
         >
           <ChevronsRight className="h-4 w-4" />
         </Button>

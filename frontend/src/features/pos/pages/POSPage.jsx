@@ -1,12 +1,14 @@
 // src/features/pos/pages/POSPage.jsx
 // ✅ Mobile: Full medicine grid + Floating cart
 // ✅ Desktop: Side-by-side layout
+// ✅ Pagination: 30 medicines per page
 
 import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import toast from 'react-hot-toast';
 
 import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button'; // ✅ Pagination Button er jonno
 import { useDebounce } from '@/hooks/useDebounce';
 
 import MedicineSearch from '../components/MedicineSearch';
@@ -16,8 +18,8 @@ import CustomerSelect from '../components/CustomerSelect';
 import SaleSummary from '../components/SaleSummary';
 import PaymentSection from '../components/PaymentSection';
 import SaleSuccessDialog from '../components/SaleSuccessDialog';
-import FloatingCart from '../components/FloatingCart';       // ✅ NEW
-import CartDrawer from '../components/CartDrawer';           // ✅ NEW
+import FloatingCart from '../components/FloatingCart';
+import CartDrawer from '../components/CartDrawer';
 
 import {
   addItem,
@@ -47,10 +49,14 @@ export default function POSPage() {
 
   const [search, setSearch] = useState('');
   const [branchId, setBranchId] = useState(null);
+  
+  // ✅ Pagination State Add Kora Holo
+  const [page, setPage] = useState(1);
+  const limit = 30; // ✅ Ek page e 30 ta medicine
 
   const [successOpen, setSuccessOpen] = useState(false);
   const [completedSale, setCompletedSale] = useState(null);
-  const [cartDrawerOpen, setCartDrawerOpen] = useState(false);   // ✅ NEW
+  const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
 
   const debouncedSearch = useDebounce(search, 300);
 
@@ -69,16 +75,26 @@ export default function POSPage() {
     setBranchId(id);
   }, [user]);
 
-  const { data: medicinesRes, isLoading, isError } = useSearchMedicinesQuery(
+  // Search korle page 1 e niye asho
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPage(1);
+  }, [debouncedSearch]);
+
+  // ✅ API call e page, limit pathano holo
+  const { data: medicinesRes, isLoading, isFetching, isError } = useSearchMedicinesQuery(
     {
       search: debouncedSearch || undefined,
       status: 'active',
-      limit: 50
+      page: page,       // ✅ Page add kora holo
+      limit: limit      // ✅ Limit 30 kora holo
     },
     { refetchOnMountOrArgChange: true }
   );
 
   const medicines = medicinesRes?.data?.medicines || [];
+  const pagination = medicinesRes?.data?.pagination || {};
+  const totalPages = pagination.totalPages || 1;
 
   const [triggerBarcodeSearch] = useLazyGetMedicineByBarcodeQuery();
   const [createSale, { isLoading: isCreating }] = useCreateSaleMutation();
@@ -163,8 +179,6 @@ export default function POSPage() {
       setCompletedSale(result.data);
       setSuccessOpen(true);
       dispatch(clearCart());
-
-      // ✅ Close cart drawer
       setCartDrawerOpen(false);
     } catch (error) {
       toast.error(error?.data?.message || 'Failed to complete sale');
@@ -178,10 +192,7 @@ export default function POSPage() {
 
   return (
     <>
-      {/* ===== MAIN LAYOUT ===== */}
       <div className="flex flex-col lg:grid lg:grid-cols-12 lg:gap-4 lg:h-[calc(100vh-6rem)]">
-
-        {/* ===== MEDICINE AREA (full width mobile, 8 cols desktop) ===== */}
         <div className="lg:col-span-8 flex flex-col gap-3 lg:min-h-0">
           <MedicineSearch
             value={search}
@@ -189,14 +200,40 @@ export default function POSPage() {
             onBarcodeSearch={handleBarcodeSearch}
           />
 
-          {/* Medicine grid — full height on mobile (no cart taking space) */}
-          <div className="flex-1 overflow-y-auto scrollbar-thin pr-1 -mr-1 pb-24 lg:pb-0">
-            <MedicineGrid
-              medicines={medicines}
-              isLoading={isLoading}
-              error={isError}
-              onAdd={handleAdd}
-            />
+          <div className="flex-1 overflow-y-auto scrollbar-thin pr-1 -mr-1 pb-24 lg:pb-0 flex flex-col">
+            <div className="flex-1">
+              <MedicineGrid
+                medicines={medicines}
+                isLoading={isLoading || isFetching} // ✅ isFetching add kora holo jate page change e loading dekhay
+                error={isError}
+                onAdd={handleAdd}
+              />
+            </div>
+
+            {/* ✅ Pagination Controls Add Kora Holo */}
+            {!debouncedSearch && totalPages > 1 && (
+              <div className="flex items-center justify-between py-4 mt-auto border-t border-border">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page === 1 || isLoading || isFetching}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                >
+                  Previous
+                </Button>
+                <span className="text-sm text-muted-foreground">
+                  Page {page} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page >= totalPages || isLoading || isFetching}
+                  onClick={() => setPage((p) => p + 1)}
+                >
+                  Next
+                </Button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -248,14 +285,12 @@ export default function POSPage() {
         </div>
       </div>
 
-      {/* ✅ MOBILE: Floating cart button */}
       <FloatingCart
         itemCount={cartItems.length}
         total={total}
         onClick={() => setCartDrawerOpen(true)}
       />
 
-      {/* ✅ MOBILE: Cart drawer (slide from bottom) */}
       <CartDrawer
         open={cartDrawerOpen}
         onOpenChange={setCartDrawerOpen}
@@ -265,7 +300,6 @@ export default function POSPage() {
         isCreating={isCreating}
       />
 
-      {/* Sale success dialog */}
       <SaleSuccessDialog
         open={successOpen}
         onOpenChange={setSuccessOpen}
