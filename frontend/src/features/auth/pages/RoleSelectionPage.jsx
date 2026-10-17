@@ -1,5 +1,6 @@
 // src/features/auth/pages/RoleSelectionPage.jsx
 // ✅ Viewport-fit — no scroll, professional
+// ✅ Left-aligned layout
 
 import { useState } from 'react';
 import { APP_NAME, APP_TAGLINE } from '@/lib/constants';
@@ -40,18 +41,18 @@ export default function RoleSelectionPage({ onSelectRole }) {
       {/* ===== MAIN CONTENT (fills remaining space) ===== */}
       <div className="flex-1 flex flex-col min-h-0 px-4 lg:px-8 py-4 lg:py-6">
 
-        {/* Hero — compact */}
-        <div className="text-center mb-4 lg:mb-6 shrink-0">
+        {/* ✅ Hero — Left aligned */}
+        <div className="text-left mb-4 lg:mb-6 shrink-0 max-w-6xl">
           <h2 className="text-xl lg:text-3xl font-bold text-foreground mb-1.5 lg:mb-2">
             Welcome to {APP_NAME}
           </h2>
-          <p className="text-xs lg:text-sm text-muted-foreground max-w-2xl mx-auto">
+          <p className="text-xs lg:text-sm text-muted-foreground max-w-2xl">
             Select your role to continue. Each role has its own permissions and access level.
           </p>
         </div>
 
-        {/* Role grid — takes remaining space */}
-        <div className="flex-1 min-h-0 flex items-center justify-center">
+        {/* ✅ Role grid — Left aligned */}
+        <div className="flex-1 min-h-0 flex items-start justify-start overflow-y-auto scrollbar-thin">
           <div className="w-full max-w-6xl">
             <RoleGrid onSelectRole={handleSelect} isLoading={isLoading} />
           </div>
