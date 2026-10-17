@@ -4,16 +4,20 @@
 const app = require('../src/app');
 const connectDB = require('../src/config/db');
 
-// ✅ Connect DB (cached — Vercel safe)
-connectDB();
-
-// ✅ Health check (Vercel e direct accessible)
-app.get('/health', (req, res) => {
-  res.json({
-    status: 'OK',
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'production'
-  });
-});
-
-module.exports = app;
+// ✅ Vercel serverless handler
+module.exports = async (req, res) => {
+  try {
+    // 1. Age database connection complete koro
+    await connectDB();
+    
+    // 2. Tarpor request ta Express app ke pathao
+    return app(req, res);
+  } catch (error) {
+    console.error('Serverless function error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal Server Error',
+      error: error.message
+    });
+  }
+};
