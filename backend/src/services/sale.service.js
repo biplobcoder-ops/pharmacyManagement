@@ -1,6 +1,5 @@
 // src/services/sale.service.js
-// ⭐ SALE SERVICE — with Payment + Stats + Notifications
-// ✅ FIXED: Floating point precision
+// ⭐ SALE SERVICE — Optimized for Bulk Operations & Speed
 
 const mongoose = require('mongoose');
 const {
@@ -19,7 +18,6 @@ const inventoryService = require('./inventory.service');
 const customerService = require('./customer.service');
 const notificationService = require('./notification.service');
 
-// ✅ Money helper
 const round2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
 
 class SaleService {
@@ -41,17 +39,14 @@ class SaleService {
     } else {
       data.items.forEach((item, index) => {
         const prefix = `items.${index}`;
-
         if (!item.medicine) {
           errors.push({ field: `${prefix}.medicine`, message: 'Medicine is required' });
         } else if (!/^[0-9a-fA-F]{24}$/.test(item.medicine)) {
           errors.push({ field: `${prefix}.medicine`, message: 'Invalid medicine ID' });
         }
-
         if (item.batch && !/^[0-9a-fA-F]{24}$/.test(item.batch)) {
           errors.push({ field: `${prefix}.batch`, message: 'Invalid batch ID' });
         }
-
         if (!item.quantity || item.quantity < 1) {
           errors.push({ field: `${prefix}.quantity`, message: 'Quantity must be at least 1' });
         }
@@ -105,6 +100,10 @@ class SaleService {
       const saleItemsData = [];
       let subtotal = 0;
       let totalCost = 0;
+      
+      // Stock update er jonno data
+      const batchUpdates = [];
+      const stockMovements = [];
 
       for (const item of data.items) {
         const medicine = await Medicine.findById(item.medicine).session(session);
@@ -153,15 +152,45 @@ class SaleService {
           subtotal = round2(subtotal + lineTotal);
           totalCost = round2(totalCost + lineCost);
 
+          // SaleItemData prepare koro (Bulk insert er jonno)
           saleItemsData.push({
-            medicine,
-            batch: alloc.batch,
+            medicine: medicine._id,
+            medicineName: medicine.name,
+            medicineImage: medicine.image || { url: null, publicId: null },
+            strength: medicine.strength,
+            dosageForm: medicine.dosageForm,
+            batch: alloc.batch._id,
+            batchNumber: alloc.batch.batchNumber,
+            expiryDate: alloc.batch.expiryDate,
             quantity: alloc.quantity,
+            returnedQuantity: 0,
             sellingPrice: alloc.batch.sellingPrice,
             costPrice: alloc.batch.purchasePrice,
             discount: 0,
+            tax: 0,
             total: lineTotal,
-            profit: lineProfit
+            profit: lineProfit,
+            sale: null // Pore set korbo
+          });
+
+          // Batch update prepare koro (BulkWrite er jonno)
+          batchUpdates.push({
+            updateOne: {
+              filter: { _id: alloc.batch._id },
+              update: { $inc: { quantity: -alloc.quantity } }
+            }
+          });
+
+          // StockMovement prepare koro
+          stockMovements.push({
+            medicine: medicine._id,
+            batch: alloc.batch._id,
+            type: 'SALE',
+            quantity: -alloc.quantity,
+            referenceType: 'Sale',
+            // referenceId: sale._id // Pore set korbo
+            user: user._id,
+            reason: `Sale item`,
           });
         }
       }
@@ -188,6 +217,7 @@ class SaleService {
       if (paidAmount >= total - 0.01) paymentStatus = 'paid';
       else if (paidAmount > 0) paymentStatus = 'partial';
 
+      // 1. Sale create koro (Fast)
       const [sale] = await Sale.create(
         [
           {
@@ -197,7 +227,7 @@ class SaleService {
             customerPhone,
             branch: data.branch,
             saleDate: data.saleDate || new Date(),
-            items: [],
+            items: [], 
             subtotal,
             discount,
             tax,
@@ -215,61 +245,25 @@ class SaleService {
         { session }
       );
 
-      const saleItemIds = [];
+      // 2. Bulk Insert SaleItems (1 query te sob insert hobe)
+      saleItemsData.forEach(item => { item.sale = sale._id; });
+      const createdItems = await SaleItem.insertMany(saleItemsData, { session });
+      
+      // 3. Sale e item id gulo update koro
+      sale.items = createdItems.map(item => item._id);
+      await sale.save({ session });
 
-      for (const itemData of saleItemsData) {
-        const {
-          medicine,
-          batch,
-          quantity,
-          sellingPrice,
-          costPrice,
-          discount: itemDiscount,
-          total: lineTotal,
-          profit
-        } = itemData;
-
-        const [saleItem] = await SaleItem.create(
-          [
-            {
-              sale: sale._id,
-              medicine: medicine._id,
-              medicineName: medicine.name,
-              medicineImage: medicine.image || { url: null, publicId: null },
-              strength: medicine.strength,
-              dosageForm: medicine.dosageForm,
-              batch: batch._id,
-              batchNumber: batch.batchNumber,
-              expiryDate: batch.expiryDate,
-              quantity,
-              returnedQuantity: 0,
-              sellingPrice,
-              costPrice,
-              discount: itemDiscount,
-              tax: 0,
-              total: lineTotal,
-              profit
-            }
-          ],
-          { session }
-        );
-
-        saleItemIds.push(saleItem._id);
-
-        await inventoryService.decreaseStock({
-          batch: batch._id,
-          quantity,
-          type: 'SALE',
-          referenceType: 'Sale',
-          referenceId: sale._id,
-          user: user._id,
-          reason: `Sale ${invoiceNumber}`,
-          session
-        });
+      // 4. Bulk Update Stock (1 query te sob batch update hobe)
+      if (batchUpdates.length > 0) {
+        await Batch.bulkWrite(batchUpdates, { session });
       }
 
-      sale.items = saleItemIds;
-      await sale.save({ session });
+      // 5. Bulk Insert StockMovements
+      if (stockMovements.length > 0) {
+        stockMovements.forEach(m => { m.referenceId = sale._id; });
+        const { StockMovement } = require('../models'); // Import if missing
+        await StockMovement.insertMany(stockMovements, { session });
+      }
 
       if (dueAmount > 0.01) {
         await customerService.updateDueBalance(customer._id, dueAmount, session);
@@ -308,6 +302,7 @@ class SaleService {
 
       await session.commitTransaction();
 
+      // ✅ Populate for response (outside transaction)
       await sale.populate([
         { path: 'customer', select: 'name phone dueBalance' },
         { path: 'branch', select: 'name code' },
@@ -331,17 +326,12 @@ class SaleService {
         req
       });
 
-      // ✅ Notification triggers (after commit, non-blocking)
+      // Notifications (non-blocking)
       try {
-        // ✅ NEW: Sale created notification (cashier sale → admin)
         await notificationService.saleCreatedNotification(sale, user);
-
-        // Low stock check for each affected medicine
         for (const medId of affectedMedicineIds) {
           await notificationService.checkLowStockForMedicine(medId, data.branch);
         }
-
-        // Customer due alert
         if (dueAmount > 0.01 && !customer.isWalkIn) {
           await notificationService.checkCustomerDue(customer._id);
         }
@@ -357,6 +347,9 @@ class SaleService {
       session.endSession();
     }
   }
+
+  // ... Baki method gulo (getAll, getStats, getById, cancel, etc.) same thakbe
+  // Tumio segulo ager moto rekhe dao, ami shudhu create() ta update korechi.
 
   async getAll(query) {
     const {

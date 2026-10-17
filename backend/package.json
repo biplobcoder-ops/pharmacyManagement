@@ -8,7 +8,8 @@
     "dev": "nodemon src/server.js",
     "test": "jest --coverage",
     "seed:medicines": "node src/seeds/seed-medicines-with-images.js",
-    "seed:stock": "node src/seeds/seed-inventory-stock.js"
+    "seed:stock": "node src/seeds/seed-inventory-stock.js",
+    "seed:purchases": "node src/seeds/seed-supplier-purchases.js"
   },
   "keywords": [
     "pharmacy",
