@@ -3,7 +3,8 @@
 
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+// ✅ Production e Vercel backend link use hobe, local e localhost
+const BASE_URL = import.meta.env.VITE_API_URL || 'https://pharmacy-management-beryl.vercel.app/api';
 
 // ✅ Base query with auth token ONLY — no Content-Type
 const baseQuery = fetchBaseQuery({
@@ -14,9 +15,6 @@ const baseQuery = fetchBaseQuery({
       headers.set('authorization', `Bearer ${token}`);
     }
     // ✅ NEVER set Content-Type manually
-    // Let fetch() auto-set based on body type:
-    //   - FormData → multipart/form-data with boundary
-    //   - Object → application/json
     return headers;
   }
 });
