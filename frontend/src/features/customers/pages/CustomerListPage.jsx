@@ -14,10 +14,7 @@ import CustomerFormDialog from '../components/CustomerFormDialog';
 import CustomerViewDialog from '../components/CustomerViewDialog';
 import PaymentDialog from '../components/PaymentDialog';
 
-import {
-  useGetCustomersQuery,
-  useDeleteCustomerMutation
-} from '../customerApi';
+import { useGetCustomersQuery, useDeleteCustomerMutation } from '../customerApi';
 
 export default function CustomerListPage() {
   const [search, setSearch] = useState('');
@@ -45,50 +42,24 @@ export default function CustomerListPage() {
     [page, limit, debouncedSearch, dueFilter]
   );
 
-  const { data: res, isLoading, refetch } = useGetCustomersQuery(queryParams);
+  const { data: res, isLoading, isFetching, refetch } = useGetCustomersQuery(queryParams);
   const [deleteCustomer, { isLoading: isDeleting }] = useDeleteCustomerMutation();
 
   const customers = res?.data?.customers || [];
   const pagination = res?.data?.pagination;
 
-  // Stats
   const stats = useMemo(() => {
     const total = pagination?.total || customers.length;
-    const totalPurchases = customers.reduce(
-      (sum, c) => sum + (c.totalPurchase || 0),
-      0
-    );
+    const totalPurchases = customers.reduce((sum, c) => sum + (c.totalPurchase || 0), 0);
     const totalDue = customers.reduce((sum, c) => sum + (c.dueBalance || 0), 0);
     const dueCount = customers.filter((c) => c.dueBalance > 0).length;
-
-    return {
-      total,
-      totalPurchases,
-      totalDue,
-      dueCount,
-      thisMonth: 0
-    };
+    return { total, totalPurchases, totalDue, dueCount, thisMonth: 0 };
   }, [customers, pagination]);
 
-  const handleOpenCreate = () => {
-    setEditTarget(null);
-    setFormOpen(true);
-  };
-
-  const handleOpenEdit = (customer) => {
-    setEditTarget(customer);
-    setFormOpen(true);
-  };
-
-  const handleOpenView = (customer) => {
-    setViewTarget(customer);
-    setViewOpen(true);
-  };
-
-  const handleOpenPayment = (customer) => {
-    setPaymentTarget(customer);
-    setPaymentOpen(true);
-  };
+  const handleOpenCreate = () => { setEditTarget(null); setFormOpen(true); };
+  const handleOpenEdit = (customer) => { setEditTarget(customer); setFormOpen(true); };
+  const handleOpenView = (customer) => { setViewTarget(customer); setViewOpen(true); };
+  const handleOpenPayment = (customer) => { setPaymentTarget(customer); setPaymentOpen(true); };
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
@@ -103,82 +74,35 @@ export default function CustomerListPage() {
 
   return (
     <>
-      <PageHeader
-        title="Customers"
-        subtitle="Manage customer profiles, purchases, payments and due balances."
-      />
-
+      <PageHeader title="Customers" subtitle="Manage customer profiles, purchases, payments and due balances." />
       <div className="space-y-6">
         <CustomerStats stats={stats} isLoading={isLoading} />
-
         <Card className="overflow-hidden">
           <div className="p-4 border-b border-border">
             <CustomerFilters
-              search={search}
-              onSearchChange={(v) => {
-                setSearch(v);
-                setPage(1);
-              }}
-              dueFilter={dueFilter}
-              onDueFilterChange={(v) => {
-                setDueFilter(v);
-                setPage(1);
-              }}
-              onExport={() => toast('Export coming soon')}
-              onAdd={handleOpenCreate}
+              search={search} onSearchChange={(v) => { setSearch(v); setPage(1); }}
+              dueFilter={dueFilter} onDueFilterChange={(v) => { setDueFilter(v); setPage(1); }}
+              onExport={() => toast('Export coming soon')} onAdd={handleOpenCreate}
             />
           </div>
-
           <CustomerTable
-            data={customers}
-            isLoading={isLoading}
-            onView={handleOpenView}
-            onEdit={handleOpenEdit}
-            onDelete={setDeleteTarget}
-            onPay={handleOpenPayment}
+            data={customers} isLoading={isLoading || isFetching}
+            onView={handleOpenView} onEdit={handleOpenEdit} onDelete={setDeleteTarget} onPay={handleOpenPayment}
           />
-
           {pagination && pagination.total > 0 && (
             <div className="border-t border-border">
-              <Pagination pagination={pagination} onPageChange={setPage} />
+              <Pagination pagination={pagination} onPageChange={setPage} isLoading={isLoading || isFetching} />
             </div>
           )}
         </Card>
       </div>
-
-      {/* Create/Edit dialog */}
-      <CustomerFormDialog
-        open={formOpen}
-        onOpenChange={setFormOpen}
-        customer={editTarget}
-        onSuccess={refetch}
-      />
-
-      {/* View dialog */}
-      <CustomerViewDialog
-        open={viewOpen}
-        onOpenChange={setViewOpen}
-        customerId={viewTarget?._id}
-      />
-
-      {/* Payment dialog */}
-      <PaymentDialog
-        open={paymentOpen}
-        onOpenChange={setPaymentOpen}
-        customer={paymentTarget}
-        onSuccess={refetch}
-      />
-
-      {/* Delete confirm */}
+      <CustomerFormDialog open={formOpen} onOpenChange={setFormOpen} customer={editTarget} onSuccess={refetch} />
+      <CustomerViewDialog open={viewOpen} onOpenChange={setViewOpen} customerId={viewTarget?._id} />
+      <PaymentDialog open={paymentOpen} onOpenChange={setPaymentOpen} customer={paymentTarget} onSuccess={refetch} />
       <ConfirmDialog
-        open={!!deleteTarget}
-        onOpenChange={(o) => !o && setDeleteTarget(null)}
-        title={`Delete "${deleteTarget?.name}"?`}
-        description="This cannot be undone. Customers with sales or due cannot be deleted."
-        confirmText="Delete"
-        variant="destructive"
-        loading={isDeleting}
-        onConfirm={handleDelete}
+        open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}
+        title={`Delete "${deleteTarget?.name}"?`} description="This cannot be undone. Customers with sales or due cannot be deleted."
+        confirmText="Delete" variant="destructive" loading={isDeleting} onConfirm={handleDelete}
       />
     </>
   );
