@@ -79,6 +79,16 @@ const limiter = rateLimit({
 });
 app.use('/api', limiter);
 
+// ===== Root Route (Vercel 404 fix) =====
+app.get('/', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Pharmacy Management API is running successfully! 🚀',
+    version: '1.0.0',
+    timestamp: new Date().toISOString()
+  });
+});
+
 // ===== Health Check =====
 // ✅ Both /health and /api/health for Vercel compatibility
 app.get('/health', (req, res) => {
